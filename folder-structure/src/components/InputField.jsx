@@ -41,8 +41,8 @@ function InputField({
 
       <input
         type="text"
-        name="name"
-        value={input?.name ?? ""}
+        name="value"
+        value={input?.value ?? ""}
         onChange={handleChange}
         className="flex-1 outline-none text-gray-800 bg-transparent placeholder-gray-400"
       />

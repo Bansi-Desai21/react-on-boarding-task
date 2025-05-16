@@ -1,32 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import InputField from "./InputField";
 
-export default function FolderStructure() {
+export default function Home() {
   const [showInput, setShowInput] = useState(false);
   const [folderStructure, setFolderStructure] = useState([]);
   const initialInput = {
-    name: "",
+    value: "",
     type: "",
-    id: "",
-    parentId: "",
-    children: [],
+    parent: "",
   };
-  const [input, setInput] = useState(initialInput);
+  const [input, setInput] = useState({});
   const [showOptions, setShowOptions] = useState(false);
   const [showInputField, setInputField] = useState(false);
   const [selectedType, setSelectedType] = useState("");
   const [parentId, setParentId] = useState("");
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-    setInput((prev) => ({
-      ...prev,
-      [name]: value,
-      id: Math.random().toString(36).substring(2, 9),
-      type: selectedType,
-      parentId: parentId,
-    }));
+  const fetchData = async () => {
+    try {
+      const response = await fetch(
+        "https://folder-structure-api.onrender.com/"
+      );
+      const data = await response.json();
+      setFolderStructure(data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    }
   };
 
   const handleClick = (type) => {
@@ -35,56 +37,67 @@ export default function FolderStructure() {
     setInputField(false);
   };
 
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    setInput((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(parentId && {
+        type: selectedType,
+        parent: parentId,
+      }),
+    }));
+  };
+
+  const handleSave = async () => {
+    try {
+      if (parentId) {
+        await fetch("https://folder-structure-api.onrender.com/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(input),
+        });
+      } else {
+        setShowInput(false);
+        await fetch(
+          "https://folder-structure-api.onrender.com/initialize-root",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(input),
+          }
+        );
+      }
+      setInputField(false);
+      setInput(initialInput);
+      await fetchData();
+    } catch (error) {
+      console.error("Error creating folder:", error);
+    }
+  };
+
   const handleCancel = () => {
     setShowInput(false);
     setInputField(false);
     setInput(initialInput);
   };
-
-  const handleSave = () => {
-    setShowInput(false);
-
-    const addChild = (nodes) => {
-      if (parentId) {
-        return nodes.map((node) => {
-          if (node.id === parentId) {
-            return {
-              ...node,
-              children: [...(node.children || []), input],
-            };
-          }
-
-          if (node.children && node.children.length > 0) {
-            return {
-              ...node,
-              children: addChild(node.children),
-            };
-          }
-          return node;
-        });
-      }
-
-      return [...nodes, input];
-    };
-
-    setFolderStructure((prev) => addChild(prev));
-    setInputField(false);
-    setInput(initialInput);
-  };
-
-  const handleMinus = (id) => {
-    const removeChild = (nodes, removeId) => {
-      return nodes
-        .filter((node) => node.id !== removeId)
-        .map((node) => ({
-          ...node,
-          children: removeChild(node.children || [], removeId),
-        }));
-    };
-
-    setFolderStructure((prev) => {
-      return removeChild(prev, id);
-    });
+  const handleMinus = async (id) => {
+    try {
+      await fetch(`https://folder-structure-api.onrender.com/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      await fetchData();
+    } catch (error) {
+      console.error("Error occurs in deleting items");
+    }
 
     setInput(initialInput);
     setParentId("");
@@ -102,7 +115,7 @@ export default function FolderStructure() {
 
   function printStructure(folderStructure) {
     return folderStructure.map((item) => (
-      <div key={item.id} className="ml-4">
+      <div key={item._id} className="ml-4">
         {" "}
         <div className="flex items-center group px-2 py-1 rounded-md relative">
           {item.type === "folder" ? (
@@ -131,12 +144,12 @@ export default function FolderStructure() {
             </svg>
           )}
 
-          <p className="ml-3 text-gray-800 font-medium">{item.name}</p>
+          <p className="ml-3 text-gray-800 font-medium">{item.value}</p>
 
           <div className="ml-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             <div
               className="p-1 rounded-md hover:bg-gray-200 cursor-pointer transition-colors relative"
-              onClick={() => handleAdd(item.id)}
+              onClick={() => handleAdd(item._id)}
             >
               {item.type === "folder" && (
                 <svg
@@ -175,7 +188,7 @@ export default function FolderStructure() {
 
             <div
               className="p-1 rounded-md hover:bg-gray-200 cursor-pointer transition-colors"
-              onClick={() => handleMinus(item.id)}
+              onClick={() => handleMinus(item._id)}
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -194,7 +207,7 @@ export default function FolderStructure() {
             </div>
           </div>
         </div>
-        {showInputField && item.id == parentId && (
+        {showInputField && item._id == parentId && (
           <div className="ml-6 mt-2">
             <InputField
               handleChange={handleChange}
